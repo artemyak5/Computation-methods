@@ -1,44 +1,54 @@
 import numpy as np
 
-def simple_iteration(A, b, tol=1e-6, max_iter=200):
-    n = len(b)
-    x = np.zeros(n)  # початкове наближення (0,0,0,0)
-    iteration_history = []  # для виведення кожної ітерації
+def seidel_method(A, b, eps=1e-4, max_iter=100):
+    """
+    Розв'язок системи A x = b методом Зейделя.
+    A - np.array(n,n)
+    b - np.array(n)
+    eps - точність для умови зупинки
+    max_iter - максимальна кількість ітерацій
+    Повертає (x, num_iter, history_residuals)
+    """
+    n = len(A)
+    x = np.zeros(n)  # початкове наближення x^(0)
+    history_res = []
 
     for k in range(max_iter):
-        x_new = np.zeros(n)
-        # Обчислення нового вектора за формулами:
-        x_new[0] = (b[0] - (A[0,1]*x[1] + A[0,2]*x[2] + A[0,3]*x[3])) / A[0,0]
-        x_new[1] = (b[1] - (A[1,0]*x[0] + A[1,2]*x[2] + A[1,3]*x[3])) / A[1,1]
-        x_new[2] = (b[2] - (A[2,0]*x[0] + A[2,1]*x[1] + A[2,3]*x[3])) / A[2,2]
-        x_new[3] = (b[3] - (A[3,0]*x[0] + A[3,1]*x[1] + A[3,2]*x[2])) / A[3,3]
+        x_old = x.copy()
+        # послідовне оновлення x_i
+        for i in range(n):
+            s1 = 0.0
+            s2 = 0.0
+            # сума по j < i  -> викор. вже "оновлені" x_j
+            for j in range(i):
+                s1 += A[i,j] * x[j]
+            # сума по j > i  -> викор. "старі" x_j
+            for j in range(i+1, n):
+                s2 += A[i,j] * x_old[j]
+            x[i] = (b[i] - s1 - s2)/A[i,i]
+        
+        # обчислимо нев’язку r^{(k+1)}
+        r = b - A.dot(x)
+        history_res.append(r)
 
-        iteration_history.append((k+1, x_new.copy(), np.linalg.norm(x_new - x, ord=np.inf)))
-        if np.linalg.norm(x_new - x, ord=np.inf) < tol:
-            return x_new, iteration_history
-        x = x_new.copy()
-    return x, iteration_history
+        # перевірка умови зупинки
+        if np.linalg.norm(x - x_old, ord=np.inf) < eps:
+            return x, (k+1), history_res
 
-# Задання системи (варіант 4)
-A = np.array([
-    [2.12,  0.42,  1.34,  0.88],
-    [0.42,  3.95,  1.87,  0.43],
-    [1.34,  1.87,  2.98,  0.46],
-    [0.88,  0.43,  0.46,  4.44]
-])
-b = np.array([11.172, 0.115, 0.009, 9.349])
+    return x, max_iter, history_res  # якщо за max_iter не досягли eps
 
-solution, history = simple_iteration(A, b, tol=1e-6, max_iter=200)
+# ----------------- Демонстрація ---------------------
+if __name__ == "__main__":
+    A = np.array([
+        [2.12, 0.42, 1.34, 0.88],
+        [0.42, 3.95, 1.87, 0.43],
+        [1.34, 1.87, 2.98, 0.46],
+        [0.88, 0.43, 0.46, 4.44]
+    ], dtype=float)
+    b = np.array([11.172, 0.115, 0.009, 9.349], dtype=float)
 
-# Вивід результатів і кожної ітерації
-print("Отриманий розв'язок:")
-print(solution)
-print("\nІтерації (номер, x^(k+1), ||x^(k+1)-x^(k)||∞):")
-for it_num, x_val, diff in history:
-    print(f"Ітерація {it_num}: x = {x_val}, критерій = {diff}")
+    x_sol, iters, res_hist = seidel_method(A, b, eps=1e-4, max_iter=50)
 
-# Обчислення нев'язки r = b - A*x
-r = b - A.dot(solution)
-print("\nВектор нев'язки r =")
-print(r)
-print("||r||∞ =", np.linalg.norm(r, ord=np.inf))
+    print(f"Знайдено x = {x_sol} за {iters} ітерацій.")
+    print("Остання нев'язка:", res_hist[-1])
+    print("Норма останньої нев'язки:", np.linalg.norm(res_hist[-1], ord=np.inf))
